@@ -16,8 +16,10 @@ gültigen `entity`-Wert zur Auswahl hat.
 - **Sticky Notes**: jeder Eintrag ein leicht gedrehter, farbiger Zettel
   (Farbe der zugehörigen Liste), mit Häkchen zum Abhaken direkt auf dem
   Zettel.
-- **Zuständigkeit**: beliebig viele Personen pro Eintrag, als Avatare auf
-  dem Zettel und als Filter-Chips im Header (analog zur Planner-Karte).
+- **Zuständigkeit**: beliebig viele Personen pro Eintrag, ausgewählt über
+  Profilbilder (kein Text nötig – auch für Kinder geeignet, die noch
+  nicht lesen können), sichtbar als Avatare auf dem Zettel und als
+  Filter-Chips im Header (analog zur Planner-Karte).
 - **Fälligkeitsdatum** wird angezeigt und bei Überfälligkeit rot markiert.
 - **Filtern**: Personen (Header) und Listen (Footer) sind anklickbar und
   heben passende Zettel hervor, statt andere komplett auszublenden.
@@ -25,6 +27,10 @@ gültigen `entity`-Wert zur Auswahl hat.
 - **Hinzufügen** über den „+“-Button im Header: Liste wählen, Titel
   (Pflichtfeld), Beschreibung, Fälligkeit und Zuständige (alles optional
   außer Titel) in einem Schritt.
+- **Bearbeiten**: Klick auf einen Zettel öffnet ein Detail-Fenster mit
+  Titel, Beschreibung, Fälligkeit, Zuständigkeit sowie Erledigt/Wieder
+  öffnen und Löschen als eigene Buttons (nicht nur über die kleine
+  Checkbox auf dem Zettel).
 
 ## Installation über HACS
 

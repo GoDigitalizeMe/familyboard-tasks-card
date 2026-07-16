@@ -179,7 +179,11 @@ class FamilyboardTasksCard extends HTMLElement {
       .filter((id) => id.startsWith("person."))
       .map((id) => {
         const state = this._hass.states[id];
-        return { person_entity_id: id, name: state.attributes.friendly_name || id };
+        return {
+          person_entity_id: id,
+          name: state.attributes.friendly_name || id,
+          picture: state.attributes.entity_picture,
+        };
       });
   }
 
@@ -334,6 +338,7 @@ class FamilyboardTasksCard extends HTMLElement {
             <div class="modal-row modal-assignees"></div>
             <div class="modal-actions">
               <button class="modal-delete">Löschen</button>
+              <button class="modal-toggle-done"></button>
               <span class="modal-spacer"></span>
               <button class="modal-cancel">Abbrechen</button>
               <button class="modal-save">Speichern</button>
@@ -374,12 +379,15 @@ class FamilyboardTasksCard extends HTMLElement {
     container.innerHTML =
       `<label>Zuständig</label><div class="assignee-picker">` +
       persons
-        .map(
-          (p) => `
+        .map((p) => {
+          const face = p.picture
+            ? `<img class="avatar" src="${escapeHtml(p.picture)}" alt="">`
+            : `<span class="avatar avatar-fallback">${escapeHtml(p.name.slice(0, 1))}</span>`;
+          return `
         <button type="button" class="assignee-option ${selectedIds.has(p.person_entity_id) ? "selected" : ""}"
-          data-person="${escapeHtml(p.person_entity_id)}"
-        >${escapeHtml(p.name)}</button>`
-        )
+          data-person="${escapeHtml(p.person_entity_id)}" title="${escapeHtml(p.name)}"
+        >${face}</button>`;
+        })
         .join("") +
       `</div>`;
     container.querySelectorAll(".assignee-option").forEach((btn) => {
@@ -515,6 +523,7 @@ class FamilyboardTasksCard extends HTMLElement {
     const assigneesContainer = backdrop.querySelector(".modal-assignees");
     const saveBtn = backdrop.querySelector(".modal-save");
     const deleteBtn = backdrop.querySelector(".modal-delete");
+    const toggleDoneBtn = backdrop.querySelector(".modal-toggle-done");
 
     bar.style.background = item.color;
     summaryInput.value = item.summary;
@@ -522,6 +531,27 @@ class FamilyboardTasksCard extends HTMLElement {
     dueInput.value = item.due ? item.due.slice(0, 10) : "";
     const selected = new Set(item.assignees || []);
     this._renderAssigneePicker(assigneesContainer, selected);
+
+    const isDone = item.status === "completed";
+    toggleDoneBtn.textContent = isDone ? "↺ Wieder öffnen" : "✓ Erledigt";
+    toggleDoneBtn.classList.toggle("is-done", isDone);
+    toggleDoneBtn.onclick = async () => {
+      toggleDoneBtn.disabled = true;
+      try {
+        await this._hass.callService("todo", "update_item", {
+          entity_id: item.list_entity_id,
+          item: item.uid,
+          status: isDone ? "needs_action" : "completed",
+        });
+        backdrop.setAttribute("hidden", "");
+        await this._refreshAfterMutation();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("familyboard-tasks-card: toggle done failed", err);
+      } finally {
+        toggleDoneBtn.disabled = false;
+      }
+    };
 
     saveBtn.onclick = async () => {
       const summary = summaryInput.value.trim();
@@ -693,18 +723,22 @@ class FamilyboardTasksCard extends HTMLElement {
         font: inherit; padding: 6px 8px; border: 1px solid var(--divider-color, #ddd); border-radius: 8px;
         background: transparent; color: inherit;
       }
-      .assignee-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+      .assignee-picker { display: flex; flex-wrap: wrap; gap: 10px; }
       .assignee-option {
-        font: inherit; font-size: 0.82em; padding: 4px 10px; border-radius: 14px;
-        border: 1px solid var(--divider-color, #ddd); background: transparent; color: inherit; cursor: pointer;
+        width: 46px; height: 46px; padding: 0; border-radius: 50%;
+        border: 3px solid transparent; background: transparent; cursor: pointer; overflow: hidden;
       }
-      .assignee-option.selected { background: var(--primary-color, #F2A6A0); color: #fff; border-color: transparent; }
-      .modal-actions { display: flex; align-items: center; gap: 8px; margin: 16px; }
+      .assignee-option .avatar { width: 100%; height: 100%; }
+      .assignee-option .avatar-fallback { font-size: 1.1em; }
+      .assignee-option.selected { border-color: var(--primary-color, #F2A6A0); }
+      .modal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px; }
       .modal-spacer { flex: 1; }
       .modal-actions button {
         font: inherit; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer;
       }
       .modal-delete { background: none; color: var(--error-color, #b3261e); padding: 8px 4px !important; }
+      .modal-toggle-done { background: var(--secondary-background-color, rgba(0,0,0,0.06)); color: #2f8f5b; }
+      .modal-toggle-done.is-done { color: var(--secondary-text-color); }
       .modal-cancel { background: var(--secondary-background-color, rgba(0,0,0,0.06)); color: inherit; }
       .modal-save { background: var(--primary-color, #F2A6A0); color: #fff; }
     </style>`;

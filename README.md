@@ -58,6 +58,7 @@ type: custom:familyboard-tasks-card
 entity: sensor.familienboard_offene_punkte   # Sensor der familyboard_tasks-Integration
 title: Familienboard
 language: de
+exclude_persons: []
 ```
 
 | Option | Standard | Beschreibung |
@@ -65,3 +66,4 @@ language: de
 | `entity` | *(erforderlich)* | Sensor-Entity der Familyboard-Tasks-Integration |
 | `title` | „Familienboard“ | Überschrift der Karte |
 | `language` | `de` | Sprache für Datumsformate (`de`/`en`) |
+| `exclude_persons` | `[]` | Liste von `person.*`-Entities, die in der Zuständigkeits-Auswahl und als Filter nicht angezeigt werden (z. B. ein Display-/Wallboard-Account) |

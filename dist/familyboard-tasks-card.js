@@ -73,7 +73,7 @@ class FamilyboardTasksCard extends HTMLElement {
     if (!config || !config.entity) {
       throw new Error("familyboard-tasks-card: 'entity' is required (the Familyboard Tasks sensor entity).");
     }
-    this._config = { title: null, language: "de", ...config };
+    this._config = { title: null, language: "de", exclude_persons: [], ...config };
     this._render();
   }
 
@@ -161,22 +161,28 @@ class FamilyboardTasksCard extends HTMLElement {
     return document.createElement("familyboard-tasks-card-editor");
   }
 
+  _isExcludedPerson(id) {
+    return (this._config.exclude_persons || []).includes(id);
+  }
+
   _personsFromItems(items) {
     const ids = new Set();
     for (const item of items) for (const id of item.assignees || []) ids.add(id);
-    return Array.from(ids).map((id) => {
-      const state = this._hass.states[id];
-      return {
-        person_entity_id: id,
-        name: state ? state.attributes.friendly_name || id : id,
-        picture: state ? state.attributes.entity_picture : null,
-      };
-    });
+    return Array.from(ids)
+      .filter((id) => !this._isExcludedPerson(id))
+      .map((id) => {
+        const state = this._hass.states[id];
+        return {
+          person_entity_id: id,
+          name: state ? state.attributes.friendly_name || id : id,
+          picture: state ? state.attributes.entity_picture : null,
+        };
+      });
   }
 
   _allPersons() {
     return Object.keys(this._hass.states)
-      .filter((id) => id.startsWith("person."))
+      .filter((id) => id.startsWith("person.") && !this._isExcludedPerson(id))
       .map((id) => {
         const state = this._hass.states[id];
         return {
@@ -336,10 +342,11 @@ class FamilyboardTasksCard extends HTMLElement {
               <input class="modal-due-input" type="date" />
             </div>
             <div class="modal-row modal-assignees"></div>
-            <div class="modal-actions">
-              <button class="modal-delete">Löschen</button>
+            <div class="modal-utility-row">
+              <button class="modal-delete">🗑 Löschen</button>
               <button class="modal-toggle-done"></button>
-              <span class="modal-spacer"></span>
+            </div>
+            <div class="modal-actions">
               <button class="modal-cancel">Abbrechen</button>
               <button class="modal-save">Speichern</button>
             </div>
@@ -731,14 +738,22 @@ class FamilyboardTasksCard extends HTMLElement {
       .assignee-option .avatar { width: 100%; height: 100%; }
       .assignee-option .avatar-fallback { font-size: 1.1em; }
       .assignee-option.selected { border-color: var(--primary-color, #F2A6A0); }
-      .modal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px; }
+      .modal-utility-row {
+        display: flex; align-items: center; justify-content: space-between;
+        margin: 18px 16px 0; padding-bottom: 14px; border-bottom: 1px solid var(--divider-color, #eee);
+      }
+      .modal-utility-row button {
+        font: inherit; font-weight: 600; font-size: 0.85em; background: none; border: none;
+        cursor: pointer; padding: 4px 2px;
+      }
+      .modal-delete { color: var(--error-color, #b3261e); }
+      .modal-toggle-done { color: #2f8f5b; }
+      .modal-toggle-done.is-done { color: var(--secondary-text-color); }
+      .modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: 16px; }
       .modal-spacer { flex: 1; }
       .modal-actions button {
-        font: inherit; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer;
+        font: inherit; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;
       }
-      .modal-delete { background: none; color: var(--error-color, #b3261e); padding: 8px 4px !important; }
-      .modal-toggle-done { background: var(--secondary-background-color, rgba(0,0,0,0.06)); color: #2f8f5b; }
-      .modal-toggle-done.is-done { color: var(--secondary-text-color); }
       .modal-cancel { background: var(--secondary-background-color, rgba(0,0,0,0.06)); color: inherit; }
       .modal-save { background: var(--primary-color, #F2A6A0); color: #fff; }
     </style>`;
@@ -751,10 +766,12 @@ const EDITOR_LABELS = {
   entity: "Entity",
   title: "Titel",
   language: "Sprache",
+  exclude_persons: "Ausgeblendete Personen",
 };
 
 const EDITOR_HELPERS = {
   entity: "Sensor-Entity der Familyboard-Tasks-Integration",
+  exclude_persons: "Diese Personen erscheinen nicht in der Zuständigkeits-Auswahl oder als Filter (z. B. ein Display-/Wallboard-Account)",
 };
 
 class FamilyboardTasksCardEditor extends HTMLElement {
@@ -792,6 +809,10 @@ class FamilyboardTasksCardEditor extends HTMLElement {
           },
         },
       },
+      {
+        name: "exclude_persons",
+        selector: { entity: { domain: "person", multiple: true } },
+      },
     ];
   }
 
@@ -809,7 +830,7 @@ class FamilyboardTasksCardEditor extends HTMLElement {
     }
 
     this._form.hass = this._hass;
-    this._form.data = { language: "de", ...this._config };
+    this._form.data = { language: "de", exclude_persons: [], ...this._config };
     this._form.schema = this._schema();
     this._form.computeLabel = (item) => EDITOR_LABELS[item.name] || item.name;
     this._form.computeHelper = (item) => EDITOR_HELPERS[item.name] || "";

@@ -16,13 +16,15 @@ function escapeHtml(value) {
   ));
 }
 
-function hexToRgba(hex, alpha) {
-  const clean = (hex || "#8FC1D4").replace("#", "");
-  const bigint = parseInt(clean, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+/**
+ * Tints a color toward the current card background instead of compositing
+ * a flat alpha over whatever sits behind the element. rgba() opacity looks
+ * fine on a white card but turns muddy/low-contrast on a dark one, since it
+ * always composites toward black. color-mix() blends toward the *actual*
+ * current theme background, so it stays legible in both light and dark mode.
+ */
+function tintedBackground(hex, percent) {
+  return `color-mix(in srgb, ${hex || "#8FC1D4"} ${percent}%, var(--card-background-color, #fff) ${100 - percent}%)`;
 }
 
 function hashCode(value) {
@@ -264,7 +266,7 @@ class FamilyboardTasksCard extends HTMLElement {
 
       return `
         <div class="note ${item.status === "completed" ? "done" : ""} ${dimmed ? "dimmed" : ""}"
-          style="background:${hexToRgba(item.color, 0.4)}; transform: rotate(${rotation}deg);"
+          style="background:${tintedBackground(item.color, 40)}; transform: rotate(${rotation}deg);"
           data-uid="${escapeHtml(item.uid)}"
           data-entity="${escapeHtml(item.list_entity_id)}"
         >
@@ -659,13 +661,18 @@ class FamilyboardTasksCard extends HTMLElement {
       .note.done .note-summary { text-decoration: line-through; opacity: 0.6; }
       .note-top { display: flex; align-items: flex-start; justify-content: space-between; }
       .note-check {
-        width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.35);
-        background: rgba(255,255,255,0.6); cursor: pointer; font-size: 0.8em; line-height: 1;
-        color: #2b2320; flex: none;
+        width: 22px; height: 22px; border-radius: 50%;
+        border: 2px solid color-mix(in srgb, var(--primary-text-color) 35%, transparent);
+        background: color-mix(in srgb, var(--card-background-color, #fff) 60%, transparent);
+        cursor: pointer; font-size: 0.8em; line-height: 1;
+        color: var(--primary-text-color); flex: none;
       }
-      .note-check.checked { background: #2b2320; color: #fff; border-color: #2b2320; }
+      .note-check.checked {
+        background: var(--primary-text-color); color: var(--card-background-color, #fff);
+        border-color: var(--primary-text-color);
+      }
       .note-assignees { display: flex; }
-      .note-assignees .avatar { margin-left: -6px; border: 2px solid rgba(255,255,255,0.8); }
+      .note-assignees .avatar { margin-left: -6px; border: 2px solid var(--card-background-color, #fff); }
       .note-assignees .avatar:first-child { margin-left: 0; }
       .note-summary { font-weight: 700; margin-top: 8px; font-size: 0.95em; word-break: break-word; }
       .note-description {
@@ -689,7 +696,7 @@ class FamilyboardTasksCard extends HTMLElement {
       .avatar-sm { width: 20px; height: 20px; }
       .avatar-fallback {
         display: inline-flex; align-items: center; justify-content: center;
-        background: #2b2320; color: #fff; font-size: 0.65em; font-weight: 700;
+        background: var(--primary-color, #F2A6A0); color: #fff; font-size: 0.65em; font-weight: 700;
       }
       .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
       .chip-btn {

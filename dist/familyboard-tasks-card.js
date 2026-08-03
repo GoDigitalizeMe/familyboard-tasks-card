@@ -853,3 +853,389 @@ window.customCards.push({
   description: "Post-it-Board für To-Dos und Einkaufslisten (inkl. Bring!) mit Zuständigkeiten und Fälligkeiten.",
   preview: false,
 });
+
+/**
+ * Familyboard Tasks Mini Card
+ *
+ * A compact "at a glance" companion to the full Tasks Card: the open-item
+ * count plus a short preview list, and a quick-add row for new items. Tap
+ * anywhere on the card (other than the add button/form) navigates to
+ * another dashboard view (typically the full Tasks Card) via plain
+ * history/SPA navigation. Item rows are display-only here - full editing
+ * stays on the big card, reached via the same tap-to-navigate.
+ */
+class FamilyboardTasksMiniCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._hass = null;
+    this._config = null;
+    this._data = null;
+    this._lastSignature = null;
+    this._fetching = false;
+    this._refreshTimer = null;
+    this._addOpen = false;
+  }
+
+  setConfig(config) {
+    if (!config || !config.entity) {
+      throw new Error("familyboard-tasks-mini-card: 'entity' is required (the Familyboard Tasks sensor entity).");
+    }
+    this._config = { title: null, language: "de", max_items: 5, navigation_path: null, ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    const prevEntityState = this._hass ? this._hass.states[this._config?.entity] : null;
+    this._hass = hass;
+    if (!this._config) return;
+
+    const entityState = hass.states[this._config.entity];
+    if (!entityState) {
+      this._render();
+      return;
+    }
+
+    const signature = `${entityState.state}|${JSON.stringify(entityState.attributes.lists || [])}`;
+    if (signature !== this._lastSignature || !prevEntityState) {
+      this._lastSignature = signature;
+      this._fetchItems(entityState);
+    } else if (!this._data) {
+      this._render();
+    }
+  }
+
+  connectedCallback() {
+    this._refreshTimer = window.setInterval(() => {
+      const entityState = this._hass && this._hass.states[this._config?.entity];
+      if (entityState) this._fetchItems(entityState);
+    }, 2 * 60 * 1000);
+  }
+
+  disconnectedCallback() {
+    if (this._refreshTimer) window.clearInterval(this._refreshTimer);
+  }
+
+  async _fetchItems(entityState) {
+    if (!this._hass || this._fetching) return;
+    const configEntryId = entityState.attributes.config_entry_id;
+    if (!configEntryId) {
+      this._render();
+      return;
+    }
+    this._fetching = true;
+    try {
+      this._data = await this._hass.connection.sendMessagePromise({
+        type: "familyboard_tasks/get_items",
+        config_entry_id: configEntryId,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("familyboard-tasks-mini-card: failed to fetch items", err);
+    } finally {
+      this._fetching = false;
+      this._render();
+    }
+  }
+
+  getCardSize() {
+    return 3;
+  }
+
+  static getStubConfig(hass) {
+    const match = Object.keys(hass.states).find(
+      (id) => id.startsWith("sensor.") && "config_entry_id" in hass.states[id].attributes && "lists" in hass.states[id].attributes
+    );
+    return { entity: match || "sensor.familienboard_offene_punkte" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("familyboard-tasks-mini-card-editor");
+  }
+
+  _navigate() {
+    const path = this._config?.navigation_path;
+    if (!path) return;
+    window.history.pushState(null, "", path);
+    window.dispatchEvent(new CustomEvent("location-changed", { bubbles: false, composed: true }));
+  }
+
+  _render() {
+    if (!this.shadowRoot) return;
+
+    if (!this._config) {
+      this.shadowRoot.innerHTML = "";
+      return;
+    }
+
+    if (!this._hass || !this._hass.states[this._config.entity]) {
+      this.shadowRoot.innerHTML = this._styles() + `
+        <div class="mini-card">
+          <div class="warning">Entity "${escapeHtml(this._config.entity)}" not found.</div>
+        </div>`;
+      return;
+    }
+
+    const lang = this._config.language === "en" ? "en" : "de";
+    const title = this._config.title || "Familienboard";
+    const maxItems = Math.max(1, Number(this._config.max_items) || 5);
+    const items = (this._data && this._data.items) || [];
+    const lists = (this._data && this._data.lists) || [];
+    const open = items
+      .filter((i) => i.status !== "completed")
+      .sort((a, b) => {
+        if (!a.due && !b.due) return 0;
+        if (!a.due) return 1;
+        if (!b.due) return -1;
+        return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
+      });
+    const preview = open.slice(0, maxItems);
+    const today = todayDateStr();
+
+    const rowHtml = (item) => {
+      const overdue = item.due && item.due.slice(0, 10) < today;
+      return `
+        <div class="mini-row">
+          <span class="dot" style="background:${item.color || "#ccc"}"></span>
+          <span class="mini-summary">${escapeHtml(item.summary)}</span>
+          ${item.due ? `<span class="mini-due ${overdue ? "overdue" : ""}">${escapeHtml(formatDue(item.due, lang))}</span>` : ""}
+        </div>`;
+    };
+
+    const body = preview.length
+      ? preview.map(rowHtml).join("") +
+        (open.length > preview.length
+          ? `<div class="mini-more">+ ${open.length - preview.length} ${lang === "de" ? "weitere" : "more"}</div>`
+          : "")
+      : `<div class="empty">${lang === "de" ? "Keine offenen Einträge 🎉" : "No open items 🎉"}</div>`;
+
+    const addRow = this._addOpen
+      ? `
+        <div class="mini-add-row">
+          <select class="mini-add-list">
+            ${lists.map((l) => `<option value="${escapeHtml(l.entity_id)}">${escapeHtml(l.name)}</option>`).join("")}
+          </select>
+          <input class="mini-add-input" type="text" placeholder="${lang === "de" ? "Titel" : "Title"}" />
+          <button type="button" class="mini-add-submit" aria-label="Hinzufügen">✓</button>
+          <button type="button" class="mini-add-cancel" aria-label="Abbrechen">✕</button>
+        </div>`
+      : "";
+
+    this.shadowRoot.innerHTML = this._styles() + `
+      <div class="mini-card ${this._config.navigation_path ? "clickable" : ""}">
+        <div class="header">
+          <div class="header-titles">
+            <div class="header-title">${escapeHtml(title)}</div>
+            <div class="header-sub">${open.length} offen</div>
+          </div>
+          <button type="button" class="add-btn" aria-label="Hinzufügen">+</button>
+        </div>
+        <div class="mini-body">${body}</div>
+        ${addRow}
+      </div>`;
+
+    this._attachEventHandlers(lists);
+  }
+
+  _attachEventHandlers(lists) {
+    const root = this.shadowRoot;
+    const card = root.querySelector(".mini-card");
+
+    if (this._config.navigation_path) {
+      card.addEventListener("click", () => this._navigate());
+    }
+
+    const addBtn = root.querySelector(".add-btn");
+    addBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      this._addOpen = !this._addOpen;
+      this._render();
+      if (this._addOpen) {
+        const input = this.shadowRoot.querySelector(".mini-add-input");
+        if (input) input.focus();
+      }
+    });
+
+    const addRow = root.querySelector(".mini-add-row");
+    if (!addRow) return;
+    addRow.addEventListener("click", (ev) => ev.stopPropagation());
+
+    const cancelBtn = addRow.querySelector(".mini-add-cancel");
+    cancelBtn.addEventListener("click", () => {
+      this._addOpen = false;
+      this._render();
+    });
+
+    const submit = async () => {
+      const listSelect = addRow.querySelector(".mini-add-list");
+      const input = addRow.querySelector(".mini-add-input");
+      const summary = input.value.trim();
+      const entityId = listSelect.value;
+      if (!summary || !entityId) return;
+      const submitBtn = addRow.querySelector(".mini-add-submit");
+      submitBtn.disabled = true;
+      try {
+        await this._hass.connection.sendMessagePromise({
+          type: "call_service",
+          domain: "familyboard_tasks",
+          service: "add_item",
+          service_data: { entity_id: entityId, summary },
+          return_response: true,
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("familyboard-tasks-mini-card: add_item failed", err);
+        submitBtn.disabled = false;
+        return;
+      }
+      this._addOpen = false;
+      try {
+        await this._hass.callService("homeassistant", "update_entity", { entity_id: this._config.entity });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("familyboard-tasks-mini-card: refresh failed", err);
+      }
+      const entityState = this._hass.states[this._config.entity];
+      if (entityState) await this._fetchItems(entityState);
+      else this._render();
+    };
+
+    addRow.querySelector(".mini-add-submit").addEventListener("click", submit);
+    addRow.querySelector(".mini-add-input").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") submit();
+    });
+  }
+
+  _styles() {
+    return `<style>
+      :host { display: block; }
+      .mini-card {
+        font-family: var(--paper-font-body1_-_font-family, "Nunito", "Segoe UI", sans-serif);
+        background: var(--ha-card-background, var(--card-background-color, #fff));
+        border-radius: var(--ha-card-border-radius, 16px);
+        box-shadow: var(--ha-card-box-shadow, 0 2px 6px rgba(0,0,0,0.15));
+        overflow: hidden;
+        color: var(--primary-text-color);
+      }
+      .mini-card.clickable { cursor: pointer; }
+      .header {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        padding: 12px 16px;
+        background: var(--familyboard-header-background, linear-gradient(135deg, #F2A6A0, #F6D186));
+        color: #2b2320;
+      }
+      .header-title { font-size: 1.1em; font-weight: 700; letter-spacing: 0.02em; }
+      .header-sub { margin-top: 2px; font-size: 0.8em; opacity: 0.85; }
+      .add-btn {
+        width: 28px; height: 28px; border-radius: 50%; border: none; flex: none;
+        background: rgba(255,255,255,0.6); color: #2b2320; font-size: 1.1em;
+        line-height: 1; cursor: pointer;
+      }
+      .add-btn:hover { background: rgba(255,255,255,0.9); }
+      .mini-body { padding: 6px 0; }
+      .mini-row { display: flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 0.88em; }
+      .mini-summary { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mini-due { font-size: 0.82em; color: var(--secondary-text-color); white-space: nowrap; }
+      .mini-due.overdue { color: #b3261e; font-weight: 700; }
+      .mini-more { padding: 4px 16px; font-size: 0.8em; color: var(--secondary-text-color); }
+      .dot { width: 9px; height: 9px; min-width: 9px; border-radius: 50%; display: inline-block; }
+      .empty { text-align: center; color: var(--secondary-text-color); padding: 18px 16px; }
+      .warning { padding: 16px; color: var(--error-color, #db4437); }
+      .mini-add-row {
+        display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+        border-top: 1px solid var(--divider-color, #eee);
+      }
+      .mini-add-row select, .mini-add-row input {
+        font: inherit; font-size: 0.85em; padding: 6px 8px; border-radius: 8px;
+        border: 1px solid var(--divider-color, #ddd); background: transparent; color: inherit;
+      }
+      .mini-add-row select { max-width: 30%; }
+      .mini-add-row input { flex: 1; min-width: 0; }
+      .mini-add-row button {
+        border: none; border-radius: 8px; width: 28px; height: 28px; flex: none; cursor: pointer;
+        font-size: 0.9em;
+      }
+      .mini-add-submit { background: var(--primary-color, #F2A6A0); color: #fff; }
+      .mini-add-cancel { background: var(--secondary-background-color, rgba(0,0,0,0.06)); color: inherit; }
+    </style>`;
+  }
+}
+
+customElements.define("familyboard-tasks-mini-card", FamilyboardTasksMiniCard);
+
+const MINI_EDITOR_LABELS = {
+  entity: "Entity",
+  title: "Titel",
+  language: "Sprache",
+  max_items: "Max. angezeigte Einträge",
+  navigation_path: "Ziel-View beim Antippen",
+};
+
+class FamilyboardTasksMiniCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config;
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  connectedCallback() {
+    this._render();
+  }
+
+  _schema() {
+    return [
+      {
+        name: "entity",
+        required: true,
+        selector: { entity: { filter: { integration: "familyboard_tasks" } } },
+      },
+      { name: "title", selector: { text: {} } },
+      {
+        name: "language",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "de", label: "Deutsch" },
+              { value: "en", label: "English" },
+            ],
+          },
+        },
+      },
+      { name: "max_items", selector: { number: { min: 1, max: 20, mode: "box" } } },
+      { name: "navigation_path", selector: { navigation: {} } },
+    ];
+  }
+
+  _render() {
+    if (!this._hass || !this._config) return;
+
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        this._config = ev.detail.value;
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config } }));
+      });
+      this.appendChild(this._form);
+    }
+
+    this._form.hass = this._hass;
+    this._form.data = { language: "de", max_items: 5, ...this._config };
+    this._form.schema = this._schema();
+    this._form.computeLabel = (item) => MINI_EDITOR_LABELS[item.name] || item.name;
+  }
+}
+
+customElements.define("familyboard-tasks-mini-card-editor", FamilyboardTasksMiniCardEditor);
+
+window.customCards.push({
+  type: "familyboard-tasks-mini-card",
+  name: "Familyboard Tasks Mini Card",
+  description: "Kompakte Vorschau der offenen Punkte mit Schnell-Hinzufügen und Sprung zur vollen Tasks-Karte.",
+  preview: false,
+});

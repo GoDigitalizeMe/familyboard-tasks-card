@@ -67,3 +67,30 @@ exclude_persons: []
 | `title` | „Familienboard“ | Überschrift der Karte |
 | `language` | `de` | Sprache für Datumsformate (`de`/`en`) |
 | `exclude_persons` | `[]` | Liste von `person.*`-Entities, die in der Zuständigkeits-Auswahl und als Filter nicht angezeigt werden (z. B. ein Display-/Wallboard-Account) |
+
+## Mini-Karte
+
+Zusätzlich zur vollen Karte enthält dieses Repo eine kompakte Variante für
+z. B. eine Übersichtsseite: `familyboard-tasks-mini-card` zeigt die Anzahl
+offener Punkte plus eine kurze Vorschauliste, dazu einen „+"-Button zum
+schnellen Hinzufügen eines neuen Eintrags (Liste + Titel). Ein Tap auf die
+Karte selbst (nicht auf den „+"-Button) springt zu einer anderen
+Dashboard-View (typischerweise die volle Tasks-Karte) – Bearbeiten
+einzelner Einträge bleibt dort.
+
+```yaml
+type: custom:familyboard-tasks-mini-card
+entity: sensor.familienboard_offene_punkte
+title: Familienboard
+language: de
+max_items: 5
+navigation_path: /lovelace-wallboard/tasks
+```
+
+| Option | Standard | Beschreibung |
+| --- | --- | --- |
+| `entity` | *(erforderlich)* | Sensor-Entity der Familyboard-Tasks-Integration |
+| `title` | „Familienboard" | Überschrift der Karte |
+| `language` | `de` | Sprache für Datumsformate (`de`/`en`) |
+| `max_items` | `5` | Maximale Anzahl in der Vorschauliste angezeigter offener Punkte |
+| `navigation_path` | *(keiner)* | Dashboard-View-Pfad, zu dem beim Antippen der Karte gesprungen wird; ohne Angabe ist die Karte nicht klickbar |

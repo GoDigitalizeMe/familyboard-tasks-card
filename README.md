@@ -84,6 +84,7 @@ entity: sensor.familienboard_offene_punkte
 title: Familienboard
 language: de
 max_items: 5
+font_scale: 1
 navigation_path: /lovelace-wallboard/tasks
 ```
 
@@ -93,4 +94,5 @@ navigation_path: /lovelace-wallboard/tasks
 | `title` | „Familienboard" | Überschrift der Karte |
 | `language` | `de` | Sprache für Datumsformate (`de`/`en`) |
 | `max_items` | `5` | Maximale Anzahl in der Vorschauliste angezeigter offener Punkte |
+| `font_scale` | `1` | Skalierungsfaktor für die gesamte Schriftgröße (z. B. `1.3` für ~30 % größer) – hilfreich für Übersichtsboards, die aus der Ferne gelesen werden |
 | `navigation_path` | *(keiner)* | Dashboard-View-Pfad, zu dem beim Antippen der Karte gesprungen wird; ohne Angabe ist die Karte nicht klickbar |

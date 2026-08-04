@@ -881,8 +881,13 @@ class FamilyboardTasksMiniCard extends HTMLElement {
     if (!config || !config.entity) {
       throw new Error("familyboard-tasks-mini-card: 'entity' is required (the Familyboard Tasks sensor entity).");
     }
-    this._config = { title: null, language: "de", max_items: 5, navigation_path: null, ...config };
+    this._config = { title: null, language: "de", max_items: 5, font_scale: 1, navigation_path: null, ...config };
     this._render();
+  }
+
+  _fontSizePx() {
+    const scale = Number(this._config?.font_scale);
+    return Math.round(16 * (Number.isFinite(scale) && scale > 0 ? scale : 1));
   }
 
   set hass(hass) {
@@ -1022,7 +1027,7 @@ class FamilyboardTasksMiniCard extends HTMLElement {
       : "";
 
     this.shadowRoot.innerHTML = this._styles() + `
-      <div class="mini-card ${this._config.navigation_path ? "clickable" : ""}">
+      <div class="mini-card ${this._config.navigation_path ? "clickable" : ""}" style="font-size:${this._fontSizePx()}px;">
         <div class="header">
           <div class="header-titles">
             <div class="header-title">${escapeHtml(title)}</div>
@@ -1124,21 +1129,21 @@ class FamilyboardTasksMiniCard extends HTMLElement {
         background: var(--familyboard-header-background, linear-gradient(135deg, #F2A6A0, #F6D186));
         color: #2b2320;
       }
-      .header-title { font-size: 1.1em; font-weight: 700; letter-spacing: 0.02em; }
-      .header-sub { margin-top: 2px; font-size: 0.8em; opacity: 0.85; }
+      .header-title { font-size: 1.25em; font-weight: 700; letter-spacing: 0.02em; }
+      .header-sub { margin-top: 2px; font-size: 0.88em; opacity: 0.85; }
       .add-btn {
-        width: 28px; height: 28px; border-radius: 50%; border: none; flex: none;
-        background: rgba(255,255,255,0.6); color: #2b2320; font-size: 1.1em;
+        width: 32px; height: 32px; border-radius: 50%; border: none; flex: none;
+        background: rgba(255,255,255,0.6); color: #2b2320; font-size: 1.25em;
         line-height: 1; cursor: pointer;
       }
       .add-btn:hover { background: rgba(255,255,255,0.9); }
       .mini-body { padding: 6px 0; }
-      .mini-row { display: flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 0.88em; }
+      .mini-row { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 1em; }
       .mini-summary { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .mini-due { font-size: 0.82em; color: var(--secondary-text-color); white-space: nowrap; }
+      .mini-due { font-size: 0.88em; color: var(--secondary-text-color); white-space: nowrap; }
       .mini-due.overdue { color: #b3261e; font-weight: 700; }
-      .mini-more { padding: 4px 16px; font-size: 0.8em; color: var(--secondary-text-color); }
-      .dot { width: 9px; height: 9px; min-width: 9px; border-radius: 50%; display: inline-block; }
+      .mini-more { padding: 4px 16px; font-size: 0.88em; color: var(--secondary-text-color); }
+      .dot { width: 10px; height: 10px; min-width: 10px; border-radius: 50%; display: inline-block; }
       .empty { text-align: center; color: var(--secondary-text-color); padding: 18px 16px; }
       .warning { padding: 16px; color: var(--error-color, #db4437); }
       .mini-add-row {
@@ -1146,14 +1151,14 @@ class FamilyboardTasksMiniCard extends HTMLElement {
         border-top: 1px solid var(--divider-color, #eee);
       }
       .mini-add-row select, .mini-add-row input {
-        font: inherit; font-size: 0.85em; padding: 6px 8px; border-radius: 8px;
+        font: inherit; font-size: 0.92em; padding: 6px 8px; border-radius: 8px;
         border: 1px solid var(--divider-color, #ddd); background: transparent; color: inherit;
       }
       .mini-add-row select { max-width: 30%; }
       .mini-add-row input { flex: 1; min-width: 0; }
       .mini-add-row button {
-        border: none; border-radius: 8px; width: 28px; height: 28px; flex: none; cursor: pointer;
-        font-size: 0.9em;
+        border: none; border-radius: 8px; width: 30px; height: 30px; flex: none; cursor: pointer;
+        font-size: 0.95em;
       }
       .mini-add-submit { background: var(--primary-color, #F2A6A0); color: #fff; }
       .mini-add-cancel { background: var(--secondary-background-color, rgba(0,0,0,0.06)); color: inherit; }
@@ -1168,6 +1173,7 @@ const MINI_EDITOR_LABELS = {
   title: "Titel",
   language: "Sprache",
   max_items: "Max. angezeigte Einträge",
+  font_scale: "Schriftgröße (Faktor)",
   navigation_path: "Ziel-View beim Antippen",
 };
 
@@ -1207,6 +1213,7 @@ class FamilyboardTasksMiniCardEditor extends HTMLElement {
         },
       },
       { name: "max_items", selector: { number: { min: 1, max: 20, mode: "box" } } },
+      { name: "font_scale", selector: { number: { min: 0.8, max: 2, step: 0.1, mode: "box" } } },
       { name: "navigation_path", selector: { navigation: {} } },
     ];
   }
@@ -1225,7 +1232,7 @@ class FamilyboardTasksMiniCardEditor extends HTMLElement {
     }
 
     this._form.hass = this._hass;
-    this._form.data = { language: "de", max_items: 5, ...this._config };
+    this._form.data = { language: "de", max_items: 5, font_scale: 1, ...this._config };
     this._form.schema = this._schema();
     this._form.computeLabel = (item) => MINI_EDITOR_LABELS[item.name] || item.name;
   }

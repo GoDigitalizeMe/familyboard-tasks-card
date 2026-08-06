@@ -85,6 +85,8 @@ title: Familienboard
 language: de
 max_items: 5
 font_scale: 1
+show_preview: true
+exclude_lists: []
 navigation_path: /lovelace-wallboard/tasks
 ```
 
@@ -95,4 +97,26 @@ navigation_path: /lovelace-wallboard/tasks
 | `language` | `de` | Sprache für Datumsformate (`de`/`en`) |
 | `max_items` | `5` | Maximale Anzahl in der Vorschauliste angezeigter offener Punkte |
 | `font_scale` | `1` | Skalierungsfaktor für die gesamte Schriftgröße (z. B. `1.3` für ~30 % größer) – hilfreich für Übersichtsboards, die aus der Ferne gelesen werden |
+| `show_preview` | `true` | Bei `false` zeigt die Karte statt der Vorschauliste nur einen Hinweistext ("Es sind X Artikel auf der Liste") plus den „+"-Button |
+| `exclude_lists` | `[]` | Liste von `todo.*`-Entities (z. B. eine Bring!-Liste), die in dieser Karteninstanz weder gezählt noch angezeigt werden |
 | `navigation_path` | *(keiner)* | Dashboard-View-Pfad, zu dem beim Antippen der Karte gesprungen wird; ohne Angabe ist die Karte nicht klickbar |
+
+### Mehrere Instanzen mit unterschiedlichen Listen
+
+Da dieselbe `entity` mehrere zugehörige Listen bündelt (eigene Liste +
+eingebundene externe Listen wie Bring!), lässt sich dieselbe Karte mehrfach
+auf einem Dashboard platzieren, um jede Liste separat darzustellen –
+`exclude_lists` steuert pro Karteninstanz, welche Listen jeweils
+ausgeblendet werden. Beispiel: eine kompakte reine Bring-Karte, die nur
+die Artikelanzahl zeigt und das Hinzufügen erlaubt, während alle anderen
+Listen für diese Instanz ausgeblendet sind:
+
+```yaml
+type: custom:familyboard-tasks-mini-card
+entity: sensor.familienboard_offene_punkte
+title: Einkaufsliste
+exclude_lists:
+  - todo.familienboard_to_do
+  - todo.hailey
+show_preview: false
+```

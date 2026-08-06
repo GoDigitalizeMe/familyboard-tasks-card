@@ -881,8 +881,21 @@ class FamilyboardTasksMiniCard extends HTMLElement {
     if (!config || !config.entity) {
       throw new Error("familyboard-tasks-mini-card: 'entity' is required (the Familyboard Tasks sensor entity).");
     }
-    this._config = { title: null, language: "de", max_items: 5, font_scale: 1, navigation_path: null, ...config };
+    this._config = {
+      title: null,
+      language: "de",
+      max_items: 5,
+      font_scale: 1,
+      navigation_path: null,
+      exclude_lists: [],
+      show_preview: true,
+      ...config,
+    };
     this._render();
+  }
+
+  _isExcludedList(entityId) {
+    return (this._config.exclude_lists || []).includes(entityId);
   }
 
   _fontSizePx() {
@@ -984,8 +997,12 @@ class FamilyboardTasksMiniCard extends HTMLElement {
     const lang = this._config.language === "en" ? "en" : "de";
     const title = this._config.title || "Familienboard";
     const maxItems = Math.max(1, Number(this._config.max_items) || 5);
-    const items = (this._data && this._data.items) || [];
-    const lists = (this._data && this._data.lists) || [];
+    const items = ((this._data && this._data.items) || []).filter(
+      (i) => !this._isExcludedList(i.list_entity_id)
+    );
+    const lists = ((this._data && this._data.lists) || []).filter(
+      (l) => !this._isExcludedList(l.entity_id)
+    );
     const open = items
       .filter((i) => i.status !== "completed")
       .sort((a, b) => {
@@ -1007,7 +1024,13 @@ class FamilyboardTasksMiniCard extends HTMLElement {
         </div>`;
     };
 
-    const body = preview.length
+    const body = this._config.show_preview === false
+      ? `<div class="mini-count">${
+          lang === "de"
+            ? `Es sind ${open.length} Artikel auf der Liste.`
+            : `There are ${open.length} items on the list.`
+        }</div>`
+      : preview.length
       ? preview.map(rowHtml).join("") +
         (open.length > preview.length
           ? `<div class="mini-more">+ ${open.length - preview.length} ${lang === "de" ? "weitere" : "more"}</div>`
@@ -1017,9 +1040,13 @@ class FamilyboardTasksMiniCard extends HTMLElement {
     const addRow = this._addOpen
       ? `
         <div class="mini-add-row">
-          <select class="mini-add-list">
-            ${lists.map((l) => `<option value="${escapeHtml(l.entity_id)}">${escapeHtml(l.name)}</option>`).join("")}
-          </select>
+          ${
+            lists.length > 1
+              ? `<select class="mini-add-list">
+                   ${lists.map((l) => `<option value="${escapeHtml(l.entity_id)}">${escapeHtml(l.name)}</option>`).join("")}
+                 </select>`
+              : `<input type="hidden" class="mini-add-list-fixed" value="${escapeHtml(lists[0]?.entity_id || "")}" />`
+          }
           <input class="mini-add-input" type="text" placeholder="${lang === "de" ? "Titel" : "Title"}" />
           <button type="button" class="mini-add-submit" aria-label="Hinzufügen">✓</button>
           <button type="button" class="mini-add-cancel" aria-label="Abbrechen">✕</button>
@@ -1072,10 +1099,10 @@ class FamilyboardTasksMiniCard extends HTMLElement {
     });
 
     const submit = async () => {
-      const listSelect = addRow.querySelector(".mini-add-list");
+      const listPicker = addRow.querySelector(".mini-add-list, .mini-add-list-fixed");
       const input = addRow.querySelector(".mini-add-input");
       const summary = input.value.trim();
-      const entityId = listSelect.value;
+      const entityId = listPicker ? listPicker.value : "";
       if (!summary || !entityId) return;
       const submitBtn = addRow.querySelector(".mini-add-submit");
       submitBtn.disabled = true;
@@ -1138,6 +1165,7 @@ class FamilyboardTasksMiniCard extends HTMLElement {
       }
       .add-btn:hover { background: rgba(255,255,255,0.9); }
       .mini-body { padding: 6px 0; }
+      .mini-count { padding: 14px 16px; font-size: 1.05em; }
       .mini-row { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 1em; }
       .mini-summary { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .mini-due { font-size: 0.88em; color: var(--secondary-text-color); white-space: nowrap; }
@@ -1174,7 +1202,14 @@ const MINI_EDITOR_LABELS = {
   language: "Sprache",
   max_items: "Max. angezeigte Einträge",
   font_scale: "Schriftgröße (Faktor)",
+  exclude_lists: "Ausgeblendete Listen",
+  show_preview: "Vorschauliste anzeigen",
   navigation_path: "Ziel-View beim Antippen",
+};
+
+const MINI_EDITOR_HELPERS = {
+  exclude_lists: "Diese Listen werden in dieser Karteninstanz weder gezählt noch angezeigt (z. B. um mehrere Karten für unterschiedliche Listen derselben Entity anzulegen)",
+  show_preview: "Bei \"Aus\" zeigt die Karte nur einen Hinweistext mit der Anzahl offener Einträge statt der Vorschauliste - z. B. praktisch für eine reine Bring-Karte",
 };
 
 class FamilyboardTasksMiniCardEditor extends HTMLElement {
@@ -1214,6 +1249,8 @@ class FamilyboardTasksMiniCardEditor extends HTMLElement {
       },
       { name: "max_items", selector: { number: { min: 1, max: 20, mode: "box" } } },
       { name: "font_scale", selector: { number: { min: 0.8, max: 2, step: 0.1, mode: "box" } } },
+      { name: "show_preview", selector: { boolean: {} } },
+      { name: "exclude_lists", selector: { entity: { domain: "todo", multiple: true } } },
       { name: "navigation_path", selector: { navigation: {} } },
     ];
   }
@@ -1232,9 +1269,17 @@ class FamilyboardTasksMiniCardEditor extends HTMLElement {
     }
 
     this._form.hass = this._hass;
-    this._form.data = { language: "de", max_items: 5, font_scale: 1, ...this._config };
+    this._form.data = {
+      language: "de",
+      max_items: 5,
+      font_scale: 1,
+      show_preview: true,
+      exclude_lists: [],
+      ...this._config,
+    };
     this._form.schema = this._schema();
     this._form.computeLabel = (item) => MINI_EDITOR_LABELS[item.name] || item.name;
+    this._form.computeHelper = (item) => MINI_EDITOR_HELPERS[item.name] || "";
   }
 }
 

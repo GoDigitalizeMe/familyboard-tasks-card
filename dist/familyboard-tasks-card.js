@@ -75,8 +75,21 @@ class FamilyboardTasksCard extends HTMLElement {
     if (!config || !config.entity) {
       throw new Error("familyboard-tasks-card: 'entity' is required (the Familyboard Tasks sensor entity).");
     }
-    this._config = { title: null, language: "de", exclude_persons: [], ...config };
+    this._config = {
+      title: null,
+      language: "de",
+      exclude_persons: [],
+      exclude_lists: [],
+      show_preview: true,
+      font_scale: 1,
+      ...config,
+    };
     this._render();
+  }
+
+  _fontSizePx() {
+    const scale = Number(this._config?.font_scale);
+    return Math.round(16 * (Number.isFinite(scale) && scale > 0 ? scale : 1));
   }
 
   set hass(hass) {
@@ -167,6 +180,10 @@ class FamilyboardTasksCard extends HTMLElement {
     return (this._config.exclude_persons || []).includes(id);
   }
 
+  _isExcludedList(entityId) {
+    return (this._config.exclude_lists || []).includes(entityId);
+  }
+
   _personsFromItems(items) {
     const ids = new Set();
     for (const item of items) for (const id of item.assignees || []) ids.add(id);
@@ -220,8 +237,12 @@ class FamilyboardTasksCard extends HTMLElement {
 
     const lang = this._config.language === "en" ? "en" : "de";
     const title = this._config.title || "Familienboard";
-    const items = (this._data && this._data.items) || [];
-    const lists = (this._data && this._data.lists) || [];
+    const items = ((this._data && this._data.items) || []).filter(
+      (i) => !this._isExcludedList(i.list_entity_id)
+    );
+    const lists = ((this._data && this._data.lists) || []).filter(
+      (l) => !this._isExcludedList(l.entity_id)
+    );
     const persons = this._personsFromItems(items);
 
     const listHighlight = this._filter.lists;
@@ -285,7 +306,9 @@ class FamilyboardTasksCard extends HTMLElement {
         </div>`;
     };
 
-    const personsRow = persons.length
+    const showPreview = this._config.show_preview !== false;
+
+    const personsRow = showPreview && persons.length
       ? `<div class="header-persons">${persons
           .map((p) => {
             const active = personHighlight.has(p.person_entity_id);
@@ -299,7 +322,7 @@ class FamilyboardTasksCard extends HTMLElement {
           .join("")}</div>`
       : "";
 
-    const listsRow = lists.length
+    const listsRow = showPreview && lists.length
       ? `<div class="legend">${lists
           .map((l) => {
             const active = listHighlight.has(l.entity_id);
@@ -313,8 +336,25 @@ class FamilyboardTasksCard extends HTMLElement {
           .join("")}</div>`
       : "";
 
+    const bodyHtml = showPreview
+      ? `<div class="notes-grid">
+           ${open.map(noteHtml).join("") || `<div class="empty">Keine offenen Einträge 🎉</div>`}
+         </div>
+         ${
+           done.length
+             ? `<button class="done-toggle" data-action="toggle-done">${this._showDone ? "▾" : "▸"} Erledigt (${done.length})</button>
+                ${this._showDone ? `<div class="notes-grid done-grid">${done.map(noteHtml).join("")}</div>` : ""}`
+             : ""
+         }
+         ${listsRow}`
+      : `<div class="count-message">${
+          lang === "de"
+            ? `Es sind ${open.length} Artikel auf der Liste.`
+            : `There are ${open.length} items on the list.`
+        }</div>`;
+
     this.shadowRoot.innerHTML = this._styles() + `
-      <div class="fb-card">
+      <div class="fb-card" style="font-size:${this._fontSizePx()}px;">
         <div class="header">
           <div class="header-titles">
             <div class="header-title">${escapeHtml(title)}</div>
@@ -323,16 +363,7 @@ class FamilyboardTasksCard extends HTMLElement {
           ${personsRow}
           <button class="add-btn" data-action="add" aria-label="Hinzufügen">+</button>
         </div>
-        <div class="notes-grid">
-          ${open.map(noteHtml).join("") || `<div class="empty">Keine offenen Einträge 🎉</div>`}
-        </div>
-        ${
-          done.length
-            ? `<button class="done-toggle" data-action="toggle-done">${this._showDone ? "▾" : "▸"} Erledigt (${done.length})</button>
-               ${this._showDone ? `<div class="notes-grid done-grid">${done.map(noteHtml).join("")}</div>` : ""}`
-            : ""
-        }
-        ${listsRow}
+        ${bodyHtml}
 
         <div class="modal-backdrop" hidden data-modal="edit">
           <div class="modal">
@@ -646,6 +677,7 @@ class FamilyboardTasksCard extends HTMLElement {
         padding: 18px;
       }
       .empty { grid-column: 1 / -1; text-align: center; color: var(--secondary-text-color); padding: 12px; }
+      .count-message { text-align: center; color: var(--secondary-text-color); padding: 24px 18px; font-size: 1.05em; }
       .note {
         border-radius: 4px;
         padding: 10px 12px 12px;
@@ -774,11 +806,17 @@ const EDITOR_LABELS = {
   title: "Titel",
   language: "Sprache",
   exclude_persons: "Ausgeblendete Personen",
+  exclude_lists: "Ausgeblendete Listen",
+  show_preview: "Vorschau (Sticky Notes) anzeigen",
+  font_scale: "Schriftgröße (Faktor)",
 };
 
 const EDITOR_HELPERS = {
   entity: "Sensor-Entity der Familyboard-Tasks-Integration",
   exclude_persons: "Diese Personen erscheinen nicht in der Zuständigkeits-Auswahl oder als Filter (z. B. ein Display-/Wallboard-Account)",
+  exclude_lists: "Diese Listen werden in dieser Karteninstanz weder gezählt noch angezeigt (z. B. um mehrere Boards für unterschiedliche Listen derselben Entity anzulegen)",
+  show_preview: "Bei \"Aus\" zeigt die Karte nur Kopfzeile und Hinweistext mit der Anzahl offener Einträge statt der Sticky-Notes - z. B. praktisch für eine reine Bring-Karte",
+  font_scale: "Skalierungsfaktor für die gesamte Schriftgröße",
 };
 
 class FamilyboardTasksCardEditor extends HTMLElement {
@@ -820,6 +858,12 @@ class FamilyboardTasksCardEditor extends HTMLElement {
         name: "exclude_persons",
         selector: { entity: { domain: "person", multiple: true } },
       },
+      {
+        name: "exclude_lists",
+        selector: { entity: { domain: "todo", multiple: true } },
+      },
+      { name: "show_preview", selector: { boolean: {} } },
+      { name: "font_scale", selector: { number: { min: 0.8, max: 2, step: 0.1, mode: "box" } } },
     ];
   }
 
@@ -837,7 +881,14 @@ class FamilyboardTasksCardEditor extends HTMLElement {
     }
 
     this._form.hass = this._hass;
-    this._form.data = { language: "de", exclude_persons: [], ...this._config };
+    this._form.data = {
+      language: "de",
+      exclude_persons: [],
+      exclude_lists: [],
+      show_preview: true,
+      font_scale: 1,
+      ...this._config,
+    };
     this._form.schema = this._schema();
     this._form.computeLabel = (item) => EDITOR_LABELS[item.name] || item.name;
     this._form.computeHelper = (item) => EDITOR_HELPERS[item.name] || "";

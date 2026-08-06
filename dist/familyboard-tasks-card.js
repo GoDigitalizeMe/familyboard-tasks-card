@@ -1166,7 +1166,10 @@ class FamilyboardTasksMiniCard extends HTMLElement {
       }
       .add-btn:hover { background: rgba(255,255,255,0.9); }
       .mini-body { padding: 6px 0; }
-      .mini-count, .empty { padding: 14px 16px; font-size: 1.05em; color: var(--primary-text-color); }
+      .mini-count, .empty {
+        text-align: center; color: var(--secondary-text-color);
+        padding: 18px 16px; font-size: 1em;
+      }
       .mini-row { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 1em; }
       .mini-summary { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .mini-due { font-size: 0.88em; color: var(--secondary-text-color); white-space: nowrap; }

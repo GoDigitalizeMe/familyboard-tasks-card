@@ -82,6 +82,7 @@ class FamilyboardTasksCard extends HTMLElement {
       exclude_lists: [],
       show_preview: true,
       font_scale: 1,
+      max_items: null,
       ...config,
     };
     this._render();
@@ -264,6 +265,11 @@ class FamilyboardTasksCard extends HTMLElement {
       return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
     });
 
+    const rawMaxItems = Number(this._config.max_items);
+    const maxItems = Number.isFinite(rawMaxItems) && rawMaxItems >= 0 ? rawMaxItems : null;
+    const visibleOpen = maxItems === null ? open : open.slice(0, maxItems);
+    const hiddenOpenCount = maxItems === null ? 0 : Math.max(0, open.length - maxItems);
+
     const avatarOrDot = (entry) =>
       entry.picture
         ? `<img class="avatar" src="${escapeHtml(entry.picture)}" alt="">`
@@ -322,7 +328,7 @@ class FamilyboardTasksCard extends HTMLElement {
           .join("")}</div>`
       : "";
 
-    const listsRow = showPreview && lists.length
+    const listsRow = showPreview && lists.length > 1
       ? `<div class="legend">${lists
           .map((l) => {
             const active = listHighlight.has(l.entity_id);
@@ -336,9 +342,14 @@ class FamilyboardTasksCard extends HTMLElement {
           .join("")}</div>`
       : "";
 
+    const notesGridContent = open.length
+      ? visibleOpen.map(noteHtml).join("") +
+        (hiddenOpenCount > 0 ? `<div class="note-more">+ ${hiddenOpenCount} weitere</div>` : "")
+      : `<div class="empty">Keine offenen Einträge 🎉</div>`;
+
     const bodyHtml = showPreview
       ? `<div class="notes-grid">
-           ${open.map(noteHtml).join("") || `<div class="empty">Keine offenen Einträge 🎉</div>`}
+           ${notesGridContent}
          </div>
          ${
            done.length
@@ -677,6 +688,11 @@ class FamilyboardTasksCard extends HTMLElement {
         padding: 18px;
       }
       .empty { grid-column: 1 / -1; text-align: center; color: var(--secondary-text-color); padding: 12px; }
+      .note-more {
+        border-radius: 4px; min-height: 100px; display: flex; align-items: center; justify-content: center;
+        border: 2px dashed var(--divider-color, #ddd); color: var(--secondary-text-color);
+        font-size: 0.85em; font-weight: 600; text-align: center;
+      }
       .count-message { text-align: center; color: var(--secondary-text-color); padding: 24px 18px; font-size: 1.05em; }
       .note {
         border-radius: 4px;
@@ -809,6 +825,7 @@ const EDITOR_LABELS = {
   exclude_lists: "Ausgeblendete Listen",
   show_preview: "Vorschau (Sticky Notes) anzeigen",
   font_scale: "Schriftgröße (Faktor)",
+  max_items: "Max. angezeigte Sticky Notes",
 };
 
 const EDITOR_HELPERS = {
@@ -817,6 +834,7 @@ const EDITOR_HELPERS = {
   exclude_lists: "Diese Listen werden in dieser Karteninstanz weder gezählt noch angezeigt (z. B. um mehrere Boards für unterschiedliche Listen derselben Entity anzulegen)",
   show_preview: "Bei \"Aus\" zeigt die Karte nur Kopfzeile und Hinweistext mit der Anzahl offener Einträge statt der Sticky-Notes - z. B. praktisch für eine reine Bring-Karte",
   font_scale: "Skalierungsfaktor für die gesamte Schriftgröße",
+  max_items: "Leer lassen für unbegrenzt. Weitere offene Einträge werden als \"+ X weitere\"-Kachel zusammengefasst.",
 };
 
 class FamilyboardTasksCardEditor extends HTMLElement {
@@ -864,6 +882,7 @@ class FamilyboardTasksCardEditor extends HTMLElement {
       },
       { name: "show_preview", selector: { boolean: {} } },
       { name: "font_scale", selector: { number: { min: 0.8, max: 2, step: 0.1, mode: "box" } } },
+      { name: "max_items", selector: { number: { min: 0, max: 200, mode: "box" } } },
     ];
   }
 

@@ -62,6 +62,7 @@ exclude_persons: []
 exclude_lists: []
 show_preview: true
 font_scale: 1
+max_items: null
 ```
 
 | Option | Standard | Beschreibung |
@@ -73,6 +74,11 @@ font_scale: 1
 | `exclude_lists` | `[]` | Liste von `todo.*`-Entities (z. B. eine Bring!-Liste), die in dieser Karteninstanz weder gezählt noch angezeigt werden – wie bei der Mini-Karte lässt sich dieselbe Entity so auf mehrere Boards mit unterschiedlichen Listen aufteilen |
 | `show_preview` | `true` | Bei `false` zeigt die Karte nur Kopfzeile und einen Hinweistext ("Es sind X Artikel auf der Liste") statt der Sticky-Notes – z. B. praktisch für eine kompakte, reine Bring-Karte |
 | `font_scale` | `1` | Skalierungsfaktor für die gesamte Schriftgröße (z. B. `1.3` für ~30 % größer) |
+| `max_items` | *(unbegrenzt)* | Maximale Anzahl gleichzeitig angezeigter offener Sticky Notes; weitere werden als "+ X weitere"-Kachel zusammengefasst |
+
+Die Listen-Filterleiste im Footer erscheint automatisch nur, wenn mehr als
+eine Liste übrig bleibt (nach Anwendung von `exclude_lists`) – bei genau
+einer Liste gibt es schließlich nichts zum Filtern.
 
 ## Mini-Karte
 

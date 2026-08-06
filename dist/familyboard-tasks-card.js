@@ -344,20 +344,21 @@ class FamilyboardTasksCard extends HTMLElement {
       : "";
 
     const displayedOpen = this._showAllOpen || maxItems === null ? open : visibleOpen;
-    const moreTile =
+    const notesGridContent = open.length
+      ? displayedOpen.map(noteHtml).join("")
+      : `<div class="empty">Keine offenen Einträge 🎉</div>`;
+    const moreLink =
       hiddenOpenCount > 0
         ? this._showAllOpen
-          ? `<button type="button" class="note-more" data-action="collapse-open">– weniger anzeigen</button>`
-          : `<button type="button" class="note-more" data-action="expand-open">+ ${hiddenOpenCount} weitere</button>`
+          ? `<button class="done-toggle note-more-link" data-action="collapse-open">▾ weniger anzeigen</button>`
+          : `<button class="done-toggle note-more-link" data-action="expand-open">▸ + ${hiddenOpenCount} weitere</button>`
         : "";
-    const notesGridContent = open.length
-      ? displayedOpen.map(noteHtml).join("") + moreTile
-      : `<div class="empty">Keine offenen Einträge 🎉</div>`;
 
     const bodyHtml = showPreview
       ? `<div class="notes-grid">
            ${notesGridContent}
          </div>
+         ${moreLink}
          ${
            done.length
              ? `<button class="done-toggle" data-action="toggle-done">${this._showDone ? "▾" : "▸"} Erledigt (${done.length})</button>
@@ -476,7 +477,7 @@ class FamilyboardTasksCard extends HTMLElement {
       });
     }
 
-    const noteMoreToggle = root.querySelector(".note-more");
+    const noteMoreToggle = root.querySelector(".note-more-link");
     if (noteMoreToggle) {
       noteMoreToggle.addEventListener("click", () => {
         this._showAllOpen = noteMoreToggle.dataset.action === "expand-open";
@@ -703,14 +704,6 @@ class FamilyboardTasksCard extends HTMLElement {
         padding: 18px;
       }
       .empty { grid-column: 1 / -1; text-align: center; color: var(--secondary-text-color); padding: 12px; }
-      .note-more {
-        border-radius: 4px; min-height: 100px; display: flex; align-items: center; justify-content: center;
-        border: 2px dashed var(--divider-color, #ddd); color: var(--secondary-text-color);
-        font-size: 0.85em; font-weight: 600; text-align: center;
-        background: none; font-family: inherit; padding: 0; cursor: pointer;
-        transition: background 0.15s ease, border-color 0.15s ease;
-      }
-      .note-more:hover { background: var(--secondary-background-color, rgba(0,0,0,0.04)); border-color: var(--primary-color, #F2A6A0); }
       .count-message { text-align: center; color: var(--secondary-text-color); padding: 24px 18px; font-size: 1.05em; }
       .note {
         border-radius: 4px;

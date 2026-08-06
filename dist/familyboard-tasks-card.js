@@ -996,7 +996,8 @@ class FamilyboardTasksMiniCard extends HTMLElement {
 
     const lang = this._config.language === "en" ? "en" : "de";
     const title = this._config.title || "Familienboard";
-    const maxItems = Math.max(1, Number(this._config.max_items) || 5);
+    const rawMaxItems = Number(this._config.max_items);
+    const maxItems = Number.isFinite(rawMaxItems) && rawMaxItems >= 0 ? rawMaxItems : 5;
     const items = ((this._data && this._data.items) || []).filter(
       (i) => !this._isExcludedList(i.list_entity_id)
     );
@@ -1024,7 +1025,7 @@ class FamilyboardTasksMiniCard extends HTMLElement {
         </div>`;
     };
 
-    const body = this._config.show_preview === false
+    const body = this._config.show_preview === false || maxItems === 0
       ? `<div class="mini-count">${
           lang === "de"
             ? `Es sind ${open.length} Artikel auf der Liste.`
@@ -1247,7 +1248,7 @@ class FamilyboardTasksMiniCardEditor extends HTMLElement {
           },
         },
       },
-      { name: "max_items", selector: { number: { min: 1, max: 20, mode: "box" } } },
+      { name: "max_items", selector: { number: { min: 0, max: 20, mode: "box" } } },
       { name: "font_scale", selector: { number: { min: 0.8, max: 2, step: 0.1, mode: "box" } } },
       { name: "show_preview", selector: { boolean: {} } },
       { name: "exclude_lists", selector: { entity: { domain: "todo", multiple: true } } },

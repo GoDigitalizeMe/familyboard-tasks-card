@@ -95,7 +95,7 @@ navigation_path: /lovelace-wallboard/tasks
 | `entity` | *(erforderlich)* | Sensor-Entity der Familyboard-Tasks-Integration |
 | `title` | „Familienboard" | Überschrift der Karte |
 | `language` | `de` | Sprache für Datumsformate (`de`/`en`) |
-| `max_items` | `5` | Maximale Anzahl in der Vorschauliste angezeigter offener Punkte |
+| `max_items` | `5` | Maximale Anzahl in der Vorschauliste angezeigter offener Punkte; bei `0` wird wie bei `show_preview: false` nur der Hinweistext angezeigt |
 | `font_scale` | `1` | Skalierungsfaktor für die gesamte Schriftgröße (z. B. `1.3` für ~30 % größer) – hilfreich für Übersichtsboards, die aus der Ferne gelesen werden |
 | `show_preview` | `true` | Bei `false` zeigt die Karte statt der Vorschauliste nur einen Hinweistext ("Es sind X Artikel auf der Liste") plus den „+"-Button |
 | `exclude_lists` | `[]` | Liste von `todo.*`-Entities (z. B. eine Bring!-Liste), die in dieser Karteninstanz weder gezählt noch angezeigt werden |

@@ -70,6 +70,45 @@ class FamilyboardTasksCard extends HTMLElement {
     this._filter = { persons: new Set(), lists: new Set() };
     this._showDone = false;
     this._showAllOpen = false;
+    this._stateRestored = false;
+  }
+
+  // Collapse state (open-list "show more" / "Erledigt" section) is kept in
+  // localStorage per entity, so it survives a full page/card reload (e.g. a
+  // kiosk wallboard that periodically refreshes the browser) instead of
+  // always resetting back to collapsed.
+  _storageKey() {
+    return this._config && this._config.entity
+      ? `familyboard-tasks-card:${this._config.entity}`
+      : null;
+  }
+
+  _loadPersistedState() {
+    const key = this._storageKey();
+    if (!key) return;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (typeof saved.showDone === "boolean") this._showDone = saved.showDone;
+      if (typeof saved.showAllOpen === "boolean") this._showAllOpen = saved.showAllOpen;
+    } catch (err) {
+      // localStorage can be unavailable (private browsing, some kiosk
+      // browsers) - fall back silently to the in-memory defaults.
+    }
+  }
+
+  _persistState() {
+    const key = this._storageKey();
+    if (!key) return;
+    try {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ showDone: this._showDone, showAllOpen: this._showAllOpen })
+      );
+    } catch (err) {
+      // ignore - same reasoning as _loadPersistedState
+    }
   }
 
   setConfig(config) {
@@ -86,6 +125,10 @@ class FamilyboardTasksCard extends HTMLElement {
       max_items: null,
       ...config,
     };
+    if (!this._stateRestored) {
+      this._loadPersistedState();
+      this._stateRestored = true;
+    }
     this._render();
   }
 
@@ -350,8 +393,8 @@ class FamilyboardTasksCard extends HTMLElement {
     const moreLink =
       hiddenOpenCount > 0
         ? this._showAllOpen
-          ? `<button class="done-toggle note-more-link" data-action="collapse-open">▾ weniger anzeigen</button>`
-          : `<button class="done-toggle note-more-link" data-action="expand-open">▸ + ${hiddenOpenCount} weitere</button>`
+          ? `<button class="note-more-link" data-action="collapse-open">▾ weniger anzeigen</button>`
+          : `<button class="note-more-link" data-action="expand-open">▸ + ${hiddenOpenCount} weitere</button>`
         : "";
 
     const bodyHtml = showPreview
@@ -469,10 +512,11 @@ class FamilyboardTasksCard extends HTMLElement {
       });
     });
 
-    const doneToggle = root.querySelector(".done-toggle");
+    const doneToggle = root.querySelector('[data-action="toggle-done"]');
     if (doneToggle) {
       doneToggle.addEventListener("click", () => {
         this._showDone = !this._showDone;
+        this._persistState();
         this._render();
       });
     }
@@ -481,6 +525,7 @@ class FamilyboardTasksCard extends HTMLElement {
     if (noteMoreToggle) {
       noteMoreToggle.addEventListener("click", () => {
         this._showAllOpen = noteMoreToggle.dataset.action === "expand-open";
+        this._persistState();
         this._render();
       });
     }
@@ -744,7 +789,7 @@ class FamilyboardTasksCard extends HTMLElement {
       }
       .note-due.overdue { color: #b3261e; }
       .note-list { text-transform: uppercase; letter-spacing: 0.03em; }
-      .done-toggle {
+      .done-toggle, .note-more-link {
         display: block; margin: 0 18px 12px; background: none; border: none;
         color: var(--secondary-text-color); cursor: pointer; font: inherit; font-size: 0.85em; padding: 4px 0;
       }

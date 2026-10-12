@@ -319,8 +319,17 @@ class FamilyboardTasksCard extends HTMLElement {
       return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
     });
 
-    const rawMaxItems = Number(this._config.max_items);
-    const maxItems = Number.isFinite(rawMaxItems) && rawMaxItems >= 0 ? rawMaxItems : null;
+    // Number(null) is 0, not "unlimited" - that previously made the default
+    // (unset) max_items silently truncate to zero preview items instead of
+    // showing everything, contradicting the editor's own "leave empty for
+    // unlimited" help text. Treat null/undefined as unlimited explicitly.
+    const configuredMaxItems = this._config.max_items;
+    const rawMaxItems = configuredMaxItems === null || configuredMaxItems === undefined
+      ? null
+      : Number(configuredMaxItems);
+    const maxItems = rawMaxItems !== null && Number.isFinite(rawMaxItems) && rawMaxItems >= 0
+      ? rawMaxItems
+      : null;
     const visibleOpen = maxItems === null ? open : open.slice(0, maxItems);
     const hiddenOpenCount = maxItems === null ? 0 : Math.max(0, open.length - maxItems);
 

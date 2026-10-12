@@ -74,13 +74,23 @@ class FamilyboardTasksCard extends HTMLElement {
   }
 
   // Collapse state (open-list "show more" / "Erledigt" section) is kept in
-  // localStorage per entity, so it survives a full page/card reload (e.g. a
-  // kiosk wallboard that periodically refreshes the browser) instead of
-  // always resetting back to collapsed.
+  // localStorage per card instance, so it survives a full page/card reload
+  // (e.g. a kiosk wallboard that periodically refreshes the browser) instead
+  // of always resetting back to collapsed. Keying on `entity` alone isn't
+  // enough: two cards (e.g. a "Tasks" card and a "Bring" card) commonly point
+  // at the *same* backend sensor and only differ by exclude_lists/title/
+  // max_items, so they'd otherwise share one localStorage key and clobber
+  // each other's collapse state on every render. Fold the config fields that
+  // actually distinguish one card instance from another into the key too.
   _storageKey() {
-    return this._config && this._config.entity
-      ? `familyboard-tasks-card:${this._config.entity}`
-      : null;
+    if (!this._config || !this._config.entity) return null;
+    const fingerprint = hashCode(JSON.stringify({
+      title: this._config.title || null,
+      excludeLists: [...(this._config.exclude_lists || [])].sort(),
+      excludePersons: [...(this._config.exclude_persons || [])].sort(),
+      maxItems: this._config.max_items ?? null,
+    }));
+    return `familyboard-tasks-card:${this._config.entity}:${fingerprint}`;
   }
 
   _loadPersistedState() {
